@@ -2,21 +2,20 @@
 #pragma tabsize 0
 
 ConVar sm_removemessages_cvar,
-sm_removemessages_gametext,
-sm_removemessages_radiochat,
-sm_removemessages_radioaudio,
-sm_removemessages_changeteam,
-sm_removemessages_changename,
-sm_removemessages_connect,
-sm_removemessages_disconnect;
+	   sm_removemessages_gametext,
+	   sm_removemessages_radio,
+	   sm_removemessages_changeteam,
+	   sm_removemessages_changename,
+	   sm_removemessages_connect,
+	   sm_removemessages_disconnect;
+
 bool cvar,
-gametext,
-radiochat,
-radioaudio,
-changeteam,
-changename,
-connect,
-disconnect;
+	 gametext,
+	 radio,
+	 changeteam,
+	 changename,
+	 connect,
+	 disconnect;
 
 new const String:g_sBlockMsgs[][] =
 {
@@ -70,9 +69,9 @@ new const String:g_sBlockMsgs[][] =
 
 public Plugin:myinfo = 
 {
-    name = "Remove Messages [CS:GO]", 
+    name = "[CS:GO] Remove Messages", 
     author = "Fox1qqq", 
-    version = "2.5",
+    version = "2.6",
     description = "Disable messages in the Chat, Radio.",
     url = "hlmod.ru"
 };
@@ -80,16 +79,15 @@ public Plugin:myinfo =
 public OnPluginStart()
 {
 	sm_removemessages_cvar = CreateConVar("sm_removemessages_cvar",     			  "1",            "[(1)Вкл/(0)Выкл] Удаление сообщений об изменении кваров.", _, true, 0.0, true, 1.0);
-	sm_removemessages_gametext = CreateConVar("sm_removemessages_gametext",           "1",            "[(1)Вкл/(0)Выкл] Удаление сообщений в чате от игры.", _, true, 0.0, true, 1.0);
-	sm_removemessages_radiochat = CreateConVar("sm_removemessages_radiochat",         "1",            "[(1)Вкл/(0)Выкл] Удаление всех радиосообщений в чате.", _, true, 0.0, true, 1.0);
-	sm_removemessages_radioaudio = CreateConVar("sm_removemessages_radioaudio",       "1",            "[(1)Вкл/(0)Выкл] Удаление всех звуков радиосообщений.", _, true, 0.0, true, 1.0);
+	sm_removemessages_gametext = CreateConVar("sm_removemessages_gametext",           "1",            "[(1)Вкл/(0)Выкл] Удаление сообщений от игры.", _, true, 0.0, true, 1.0);
+	sm_removemessages_radio = CreateConVar("sm_removemessages_radio",   			  "1",            "[(1)Вкл/(0)Выкл] Удаление всех радиосообщений.", _, true, 0.0, true, 1.0);
 	sm_removemessages_changeteam = CreateConVar("sm_removemessages_changeteam",       "1",            "[(1)Вкл/(0)Выкл] Удаление сообщений о смене команд игроками.", _, true, 0.0, true, 1.0);
 	sm_removemessages_changename = CreateConVar("sm_removemessages_changename",       "1",            "[(1)Вкл/(0)Выкл] Удаление сообщений о смене ников.", _, true, 0.0, true, 1.0);
 	sm_removemessages_connect = CreateConVar("sm_removemessages_connect",             "1",            "[(1)Вкл/(0)Выкл] Удаление сообщений о подключении игроков.", _, true, 0.0, true, 1.0);
 	sm_removemessages_disconnect = CreateConVar("sm_removemessages_disconnect",       "1",            "[(1)Вкл/(0)Выкл] Удаление сообщений об отключении игроков.", _, true, 0.0, true, 1.0);
     
     HookUserMessage(GetUserMessageId("TextMsg"), UserMsgText, true);
-    HookUserMessage(GetUserMessageId("RadioText"), UserMsgRadioText, true);
+	HookUserMessage(GetUserMessageId("RadioText"), UserMsgRadio1, true);
     HookUserMessage(GetUserMessageId("SayText2"), SayText2, true);
 
     HookEvent("player_team", OnTeam, EventHookMode_Pre);
@@ -100,7 +98,7 @@ public OnPluginStart()
 	decl String:r[][]={"cheer", "compliment", "coverme", "fallback", "followme", "enemydown", "enemyspot", "getinpos", "getout", "go", "holdpos", "inposition",
 	"needbackup", "negative", "nice", "regroup", "report", "reportingin", "roger", "sectorclear", "sticktog", "stormfront", "takingfire", "takepoint", "thanks"};
 	new i=sizeof(r)-1;
-	do AddCommandListener(UserMsgRadioAudio, r[i]);
+	do AddCommandListener(UserMsgRadio2, r[i]);
 	while(i--);
 	
     AutoExecConfig(true, "remove_messages", "sourcemod");
@@ -108,11 +106,10 @@ public OnPluginStart()
 
 public OnConfigsExecuted()
 {
-	ServerCommand("sv_ignoregrenaderadio 1");
+	FindConVar("sv_ignoregrenaderadio").IntValue = sm_removemessages_radio.IntValue;
     cvar = sm_removemessages_cvar.BoolValue;
     gametext = sm_removemessages_gametext.BoolValue;
-    radiochat = sm_removemessages_radiochat.BoolValue;
-	radioaudio = sm_removemessages_radioaudio.BoolValue;
+	radio = sm_removemessages_radio.BoolValue;
     changeteam = sm_removemessages_changeteam.BoolValue;
     changename = sm_removemessages_changename.BoolValue;
     connect = sm_removemessages_connect.BoolValue;
@@ -129,13 +126,9 @@ public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] n
     {
         gametext = convar.BoolValue;
     }
-    else if (convar == sm_removemessages_radiochat)
+    else if (convar == sm_removemessages_radio)
     {
-        radiochat = convar.BoolValue;
-    }
-    else if (convar == sm_removemessages_radioaudio)
-    {
-        radioaudio = convar.BoolValue;
+        radio = convar.BoolValue;
     }
     else if (convar == sm_removemessages_changeteam)
     {
@@ -175,26 +168,18 @@ public Action:UserMsgText(UserMsg:msg_id, Handle:msg, const players[], playersNu
     return Plugin_Continue;
 }
 
-public Action:UserMsgRadioText(UserMsg:msg_id, Handle:pb, players[], playersNum, bool:reliable, bool:init) return radiochat ? Plugin_Handled : Plugin_Continue;
+public Action:UserMsgRadio1(UserMsg:msg_id, Handle:pb, players[], playersNum, bool:reliable, bool:init) return radio ? Plugin_Handled : Plugin_Continue;
 
-public Action:UserMsgRadioAudio(C, String:N[], A) return radioaudio ? Plugin_Handled : Plugin_Continue;
+public Action:UserMsgRadio2(C, String:N[], A) return radio ? Plugin_Handled : Plugin_Continue;
 
-public Action:OnTeam(Handle:event, const String:name[], bool:dontBroadcast) 
+public Action:OnTeam(Event event, const char[] name, bool dontBroadcast)
 {
-    if(!dontBroadcast) 
+	if(changeteam)
 	{
-        Handle new_event = CreateEvent("player_team", true);
-    
-        SetEventInt(new_event, "userid", GetEventInt(event, "userid"));
-        SetEventInt(new_event, "team", GetEventInt(event, "team"));
-        SetEventInt(new_event, "oldteam", GetEventInt(event, "oldteam"));
-        SetEventBool(new_event, "disconnect", GetEventBool(event, "disconnect"));
-        
-        FireEvent(new_event, true);
-    
-        return changeteam ? Plugin_Handled : Plugin_Continue;
-    }
-    return Plugin_Continue;
+		if(!event.GetBool("disconnect"))
+			event.SetBool("silent", true);
+	}	
+	return Plugin_Continue;
 }
 
 public Action:SayText2(UserMsg:msg_id, Handle:bf, players[], playersNum, bool:reliable, bool:init)
